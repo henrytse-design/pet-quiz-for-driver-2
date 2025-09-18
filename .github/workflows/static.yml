@@ -1,43 +1,317 @@
-# Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>毛孩界嘅五星級司機測驗</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .container {
+            max-width: 600px;
+        }
+        .question-option {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .question-option:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .loading-spinner {
+            border-top-color: #3B82F6;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .pet-emoji {
+            font-size: 3rem;
+            transition: transform 0.3s;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
 
-on:
-  # Runs on pushes targeting the default branch
-  push:
-    branches: ["main"]
+    <!-- 主容器 -->
+    <div id="game-container" class="bg-white rounded-xl shadow-2xl p-6 md:p-10 w-full container">
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+        <!-- 司機資料輸入頁面 -->
+        <div id="info-page" class="text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
+                【測試：你係毛孩界嘅五星級司機嗎？】
+            </h1>
+            <p class="text-gray-600 mb-6 text-sm md:text-base">
+                測驗滿分嘅毛孩界五星級司機，即可獲得20 GO分！
+            </p>
+            <p class="text-gray-600 mb-8 text-sm md:text-base">
+                請輸入你的司機ID同電話號碼，然後開始測試！😊
+            </p>
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+            <div class="space-y-4 mb-6">
+                <input type="text" id="driver-id" placeholder="輸入你的司機ID" class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="tel" id="phone-number" placeholder="輸入你的電話號碼" class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            
+            <div id="info-error" class="text-red-500 mb-4 hidden"></div>
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
+            <button id="start-btn" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-300">
+                開始測試
+            </button>
+        </div>
 
-jobs:
-  # Single deploy job since we're just deploying
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          # Upload entire repository
-          path: '.'
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+        <!-- 測驗頁面 -->
+        <div id="quiz-page" class="hidden text-center">
+            <!-- 寵物表情區 -->
+            <div class="flex justify-center items-center space-x-6 mb-8">
+                <span id="dog-emoji" class="pet-emoji">🐶</span>
+                <span id="cat-emoji" class="pet-emoji">🐱</span>
+            </div>
+            
+            <div class="mb-6">
+                <h2 class="text-xl md:text-2xl font-semibold text-gray-700 mb-2">
+                    <span id="question-number"></span>
+                </h2>
+                <p id="question-text" class="text-lg md:text-xl text-gray-800 font-medium"></p>
+            </div>
+            
+            <div id="options-container" class="space-y-3">
+                <!-- 選項會在這裡動態生成 -->
+            </div>
+
+            <!-- 答案回饋訊息 -->
+            <div id="feedback-message" class="mt-6 text-lg font-bold"></div>
+        </div>
+
+        <!-- 結果頁面 -->
+        <div id="result-page" class="hidden text-center">
+            <div class="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 rounded-lg mb-6" role="alert">
+                <p class="font-bold text-lg md:text-xl">測試完成！</p>
+                <p id="final-score-text" class="mt-2 text-base md:text-lg"></p>
+            </div>
+            <div id="loading-message" class="hidden">
+                <div class="flex items-center justify-center space-x-2">
+                    <div class="loading-spinner h-6 w-6 border-4 rounded-full border-gray-200"></div>
+                    <span class="text-gray-600 font-medium">正在提交結果...</span>
+                </div>
+            </div>
+            <div id="submit-success" class="hidden">
+                <div class="flex items-center justify-center space-x-2 text-green-600 font-bold">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>結果已成功提交！</span>
+                </div>
+            </div>
+            <div id="submit-error" class="hidden">
+                <div class="flex items-center justify-center space-x-2 text-red-600 font-bold">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>提交失敗，請重試。</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const infoPage = document.getElementById('info-page');
+        const quizPage = document.getElementById('quiz-page');
+        const resultPage = document.getElementById('result-page');
+        const startBtn = document.getElementById('start-btn');
+        const driverIdInput = document.getElementById('driver-id');
+        const phoneNumberInput = document.getElementById('phone-number');
+        const infoError = document.getElementById('info-error');
+        const questionNumberEl = document.getElementById('question-number');
+        const questionTextEl = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+        const finalScoreTextEl = document.getElementById('final-score-text');
+        const loadingMessageEl = document.getElementById('loading-message');
+        const submitSuccessEl = document.getElementById('submit-success');
+        const submitErrorEl = document.getElementById('submit-error');
+        const dogEmojiEl = document.getElementById('dog-emoji');
+        const catEmojiEl = document.getElementById('cat-emoji');
+        const feedbackMessageEl = document.getElementById('feedback-message');
+
+        const GOOGLE_SHEET_APP_URL = "https://script.google.com/macros/s/AKfycbxx2zNR8ag5iMQGGF4WYZwWwaGOQj45LZgdCjc29IXNwt7Kr3ed4fnefieinLHQknaa/exec";
+
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let driverId = '';
+        let phoneNumber = '';
+
+        const quizData = [
+            {
+                question: '接到寵物訂單後，應該點樣與客人溝通？',
+                options: ['A. 唔使特別聯絡，直接上門接載', 'B. 打電話了解寵物擺位及特別事項', 'C. 等客人主動聯絡'],
+                answer: 'B'
+            },
+            {
+                question: '每次接載寵物後，應該做啲咩清潔工作？',
+                options: ['A. 唔需要清潔', 'B. 打掃座位，確保車廂無異味', 'C. 只需打掃見到污漬嘅部分'],
+                answer: 'B'
+            },
+            {
+                question: '接載大隻金毛同細細粒茶杯貴婦，應該有唔同嘅服務態度嗎？',
+                options: ['A. 無需要，所有毛孩都應一視同仁', 'B. 大狗特別注意，小狗可以隨意', 'C. 睇心情'],
+                answer: 'A'
+            },
+            {
+                question: '點樣令寵物喺車上感到輕鬆自在？',
+                options: ['A. 大聲同佢哋講話，增加熟悉感', 'B. 放輕聲量，保持親切笑容', 'C. 唔理佢哋，專注駕駛'],
+                answer: 'B'
+            },
+            {
+                question: '如果客人需要，應該提供咩裝置固定寵物籠？',
+                options: ['A. 繩索或飛機帶', 'B. 用手扶住', 'C. 唔需要提供，客人自理'],
+                answer: 'A'
+            },
+            {
+                question: '行車期間，應該點樣保障寵物安全？',
+                options: ['A. 減慢車速，提醒主人檢查寵物籠安全扣', 'B. 開快啲，盡快送到目的地', 'C. 唔需要特別注意'],
+                answer: 'A'
+            },
+            {
+                question: '寵物耳朵靈敏，應該喺車廂內保持咩語音音量？',
+                options: ['A. 輕聲細語', 'B. 正常音量即可', 'C. 大聲講話'],
+                answer: 'A'
+            },
+            {
+                question: '接載寵物訂單時，點解要特別注意細節？',
+                options: ['A. 因為每個小細節都係對寵物同主人嘅關懷', 'B. 因為細節影響評分', 'C. 唔需要特別注意'],
+                answer: 'A'
+            },
+            {
+                question: '點樣確保下一位乘客可以享受清潔嘅車廂？',
+                options: ['A. 每次寵物落車後清潔座位', 'B. 等乘客自己處理', 'C. 每日一次清潔即可'],
+                answer: 'A'
+            },
+            {
+                question: '睇完寵物訂單指引後，應該有咩態度去完成訂單？',
+                options: ['A. 得心應手，專業服務', 'B. 隨便完成', 'C. 唔需要理會'],
+                answer: 'A'
+            }
+        ];
+
+        startBtn.addEventListener('click', () => {
+            driverId = driverIdInput.value.trim();
+            phoneNumber = phoneNumberInput.value.trim();
+
+            if (!driverId || !phoneNumber) {
+                infoError.textContent = '司機ID同電話號碼都係必填項目！';
+                infoError.classList.remove('hidden');
+                return;
+            }
+
+            infoError.classList.add('hidden');
+            infoPage.classList.add('hidden');
+            quizPage.classList.remove('hidden');
+            renderQuestion();
+        });
+        
+        // 渲染題目
+        function renderQuestion() {
+            if (currentQuestionIndex >= quizData.length) {
+                endQuiz();
+                return;
+            }
+
+            const currentQuestion = quizData[currentQuestionIndex];
+            questionNumberEl.textContent = `第 ${currentQuestionIndex + 1} 題 / 共 ${quizData.length} 題`;
+            questionTextEl.textContent = currentQuestion.question;
+            optionsContainer.innerHTML = '';
+            feedbackMessageEl.textContent = '';
+            
+            // 重置寵物表情
+            dogEmojiEl.textContent = '🐶';
+            catEmojiEl.textContent = '🐱';
+            
+            currentQuestion.options.forEach((optionText) => {
+                const optionButton = document.createElement('button');
+                optionButton.textContent = optionText;
+                optionButton.classList.add('question-option', 'w-full', 'bg-gray-200', 'text-gray-800', 'py-3', 'px-4', 'rounded-lg', 'font-medium', 'text-left', 'hover:bg-blue-200', 'transition', 'duration-200');
+                optionButton.addEventListener('click', () => handleAnswer(optionText.charAt(0)));
+                optionsContainer.appendChild(optionButton);
+            });
+        }
+
+        // 處理答案
+        function handleAnswer(selectedAnswer) {
+            const currentQuestion = quizData[currentQuestionIndex];
+            if (selectedAnswer === currentQuestion.answer) {
+                score++;
+                // 答對，顯示快樂表情並前進
+                updatePetStatus(true);
+                setTimeout(() => {
+                    currentQuestionIndex++;
+                    renderQuestion();
+                }, 1000); // 延遲1秒後進入下一題
+            } else {
+                // 答錯，顯示不快樂表情並維持在當前題目
+                updatePetStatus(false);
+            }
+        }
+
+        // 更新寵物表情
+        function updatePetStatus(isCorrect) {
+            if (isCorrect) {
+                dogEmojiEl.textContent = '🐕'; // 快樂的狗狗
+                catEmojiEl.textContent = '😸'; // 快樂的貓咪
+                feedbackMessageEl.textContent = '答對了！你真棒！';
+                feedbackMessageEl.classList.remove('text-red-500');
+                feedbackMessageEl.classList.add('text-green-600');
+            } else {
+                dogEmojiEl.textContent = '🐕‍🦺'; // 不快樂的狗狗
+                catEmojiEl.textContent = '😾'; // 不快樂的貓咪
+                feedbackMessageEl.textContent = '答錯了，請再試一次！';
+                feedbackMessageEl.classList.remove('text-green-600');
+                feedbackMessageEl.classList.add('text-red-500');
+            }
+        }
+
+        async function endQuiz() {
+            quizPage.classList.add('hidden');
+            resultPage.classList.remove('hidden');
+
+            const totalScore = score * (100 / quizData.length);
+            let message = `你答對了 ${score} 題，總分為 ${totalScore} 分。`;
+            if (totalScore === 100) {
+                message += '恭喜你！你係毛孩界嘅五星級司機！🎉 你已獲得20 GO分！';
+            } else {
+                message += '繼續努力，下次會更好！';
+            }
+            finalScoreTextEl.textContent = message;
+
+            // 提交結果到 Google Sheet
+            loadingMessageEl.classList.remove('hidden');
+            submitSuccessEl.classList.add('hidden');
+            submitErrorEl.classList.add('hidden');
+
+            try {
+                // 使用 GET 請求並將資料作為 URL 參數傳送
+                const params = new URLSearchParams({
+                    driverId: driverId,
+                    phoneNumber: phoneNumber,
+                    score: totalScore
+                });
+                const fullUrl = `${GOOGLE_SHEET_APP_URL}?${params.toString()}`;
+
+                const response = await fetch(fullUrl, {
+                    method: 'GET'
+                });
+
+                // 由於 GET 請求在這種情況下通常會成功，我們假設提交成功
+                loadingMessageEl.classList.add('hidden');
+                submitSuccessEl.classList.remove('hidden');
+            } catch (error) {
+                console.error('Error submitting data:', error);
+                loadingMessageEl.classList.add('hidden');
+                submitErrorEl.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
+
